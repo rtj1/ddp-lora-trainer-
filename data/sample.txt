@@ -1,0 +1,5 @@
+The quick brown fox jumps over the lazy dog.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+Distributed training with PyTorch DDP enables scalable model fine-tuning.
+Low-Rank Adaptation (LoRA) reduces memory by training adapter weights.
+This is a tiny sample dataset for smoke testing the training loop.

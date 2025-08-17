@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pt
+*.bin
+*.log
+checkpoints/
+wandb/
+dist/
+*.egg-info/
+.cache/

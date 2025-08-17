@@ -1,0 +1,53 @@
+seed: 42
+device:
+  cuda_if_available: true
+
+model:
+  name: ${env:MODEL_NAME,gpt2}
+  tokenizer_name: ${env:TOKENIZER_NAME,gpt2}
+  dtype: bf16  # bf16 | fp16 | fp32
+  use_8bit: false
+
+lora:
+  enabled: true
+  r: 8
+  alpha: 16
+  dropout: 0.05
+  target_modules: ["c_attn", "q_proj", "k_proj", "v_proj", "o_proj"]
+
+training:
+  max_steps: 200
+  warmup_steps: 20
+  lr: 2.0e-4
+  weight_decay: 0.01
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_eps: 1.0e-8
+  batch_size_per_device: 2
+  grad_accum_steps: 8
+  log_interval: 10
+  save_interval: 100
+  eval_interval: 100
+  max_grad_norm: 1.0
+
+data:
+  use_hf_streaming: false
+  hf_dataset: ${env:HF_DATASET,}
+  hf_split: ${env:HF_DATASET_SPLIT,train}
+  local_file: ${env:DATA_FILE,./data/sample.txt}
+  block_size: 512
+  num_workers: 4
+  prefetch_factor: 4
+  pin_memory: true
+
+checkpoint:
+  output_dir: ${env:OUTPUT_DIR,./checkpoints}
+  resume_from: ${env:RESUME_FROM,}
+  save_lora_only: true
+
+logging:
+  wandb:
+    enabled: true
+    project: ${env:WANDB_PROJECT,ddp-lora-llm}
+    entity: ${env:WANDB_ENTITY,}
+    run_name: ${env:RUN_NAME,dev-run}

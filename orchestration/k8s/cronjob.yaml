@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ddp-lora-train
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            nvidia.com/gpu.present: "true"
+          containers:
+          - name: trainer
+            image: ghcr.io/your-org/ddp-lora-trainer:latest
+            imagePullPolicy: IfNotPresent
+            command: ["bash","-lc"]
+            args:
+              - |
+                set -e
+                cd /workspace
+                bash scripts/launch_local.sh ${GPUS_PER_NODE:-4} configs/base.yaml                   data.use_hf_streaming=${USE_HF_STREAMING:-false}                   data.hf_dataset=${HF_DATASET:-}                   RUN_NAME=k8s-$(date +%Y%m%d)
+            env:
+            - name: WANDB_API_KEY
+              valueFrom:
+                secretKeyRef: { name: wandb-secret, key: api_key }
+            - name: WANDB_PROJECT
+              value: ddp-lora-llm
+            - name: USE_HF_STREAMING
+              value: "false"
+            - name: HF_DATASET
+              value: ""
+            - name: GPUS_PER_NODE
+              value: "4"
+            resources:
+              limits:
+                nvidia.com/gpu: 4
+                cpu: "16"
+                memory: "64Gi"
+              requests:
+                nvidia.com/gpu: 4
+                cpu: "8"
+                memory: "32Gi"
+            volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          volumes:
+          - name: workspace
+            persistentVolumeClaim:
+              claimName: ddp-lora-pvc
