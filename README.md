@@ -1,56 +1,127 @@
-# Distributed Training Infrastructure for LLMs (DDP + LoRA + W&B)
+# 🚀 Distributed LoRA Trainer  
+**Reproducible Infrastructure for Fine-Tuning Large Language Models**  
+*DDP · FSDP · DeepSpeed · QLoRA · W&B · Airflow · Kubernetes*  
 
-Production-grade starter to fine-tune LLMs with **PyTorch DDP**, **LoRA (PEFT)**, multi-node launch scripts,
-**Weights & Biases** logging, and robust checkpoint/recovery.
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)  
+[![PyTorch](https://img.shields.io/badge/pytorch-2.0+-red.svg)](https://pytorch.org/)  
+[![Transformers](https://img.shields.io/badge/huggingface-transformers-yellow.svg)](https://huggingface.co/transformers/)  
+[![DeepSpeed](https://img.shields.io/badge/deepspeed-enabled-green.svg)](https://github.com/microsoft/DeepSpeed)  
+[![W&B](https://img.shields.io/badge/Weights_&_Biases-logging-orange.svg)](https://wandb.ai/)  
 
-## Quickstart
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -U pip && pip install -r requirements.txt
-cp .env.example .env
-python -m src.train --config configs/base.yaml training.max_steps=50 device.cuda_if_available=false
+---
+
+## 📌 Overview
+This project provides a **production-grade, reproducible training infrastructure** for fine-tuning LLMs with parameter-efficient adapters (LoRA/QLoRA). It’s designed for:  
+- **Scalable distributed training** across multi-GPU/multi-node clusters.  
+- **Experiment reproducibility** with config-driven workflows.  
+- **High throughput** with sharded streaming datasets + optimized I/O.  
+- **Research enablement**: rapid prototyping of new training methods.  
+
+![Architecture](architecture.png)
+
+---
+
+## ✨ Features
+- ⚡ **Distributed Backends:** PyTorch DDP, FSDP, DeepSpeed (Zero-2/3).  
+- 💾 **Parameter-Efficient Fine-Tuning:** LoRA + 4-bit QLoRA (bitsandbytes).  
+- 📊 **Experiment Tracking:** Automated logging, checkpointing, and sweeps with **Weights & Biases**.  
+- 🗂 **Streaming Datasets:** Shard-aware Hugging Face `datasets` with per-rank partitioning.  
+- 🧩 **Config-Driven:** YAML + `.env` toggles for reproducibility.  
+- ☸️ **Orchestration:** Airflow DAGs + Kubernetes CronJobs for scheduled training.  
+- 🛠 **Resilience:** Standardized checkpoints, monitoring, and failure recovery.  
+
+---
+
+## 📂 Project Structure
 ```
-For single-node DDP (e.g., 4 GPUs):
+ddp-lora-trainer/
+│
+├── configs/                # YAML configs
+├── src/                    # Core training code
+├── scripts/                # Launchers & sweep runners
+├── sweeps/                 # W&B sweep configs
+├── orchestration/
+│   ├── airflow/            # Airflow DAGs
+│   └── k8s/                # Kubernetes manifests
+├── deepspeed/              # ZeRO configs
+├── Dockerfile
+├── README.md
+└── .env.example
+```
+
+---
+
+## 🚀 Quickstart
+
+### 1. Install
+```bash
+git clone https://github.com/<your-username>/ddp-lora-trainer.git
+cd ddp-lora-trainer
+pip install -r requirements.txt
+```
+
+### 2. Local DDP (4 GPUs)
 ```bash
 bash scripts/launch_local.sh 4 configs/base.yaml
 ```
 
+### 3. Hugging Face Streaming Dataset
+```bash
+python -m src.train --config configs/base.yaml   data.use_hf_streaming=true data.hf_dataset=wikitext data.hf_split=train
+```
+
+### 4. DeepSpeed
+```bash
+python -m src.train --config configs/base.yaml   distributed.backend=deepspeed distributed.deepspeed_config=./deepspeed/zero2.json
+```
+
+### 5. FSDP
+```bash
+python -m src.train --config configs/base.yaml   distributed.backend=fsdp fsdp.sharding_strategy=full fsdp.mixed_precision=bf16
+```
+
+### 6. QLoRA (4-bit)
+```bash
+python -m src.train --config configs/base.yaml   quantization.load_in_4bit=true quantization.compute_dtype=bf16
+```
 
 ---
 
-## Hugging Face Streaming (shard-aware)
-
-Enable streaming and set your dataset:
+## 📊 Weights & Biases
+Run training with W&B logging:
 ```bash
-python -m src.train --config configs/base.yaml   data.use_hf_streaming=true data.hf_dataset=your_dataset_name data.hf_split=train
+WANDB_PROJECT=ddp-lora-trainer WANDB_API_KEY=your_key bash scripts/launch_local.sh 4 configs/base.yaml
 ```
-- Each DDP rank gets a **disjoint shard** of the stream.
-- Set `HF_TOKEN` if the dataset requires auth.
-- Streaming uses `num_workers=0` by design.
-
-## Orchestration
-
-### Airflow
-Set Airflow Variables (UI → Admin → Variables):
-- `ddp_lora_repo_path` (path to repo on GPU worker)
-- `use_hf_streaming` (`true`/`false`)
-- `hf_dataset` (e.g., `wikitext`)
-- `wandb_disabled` (`true`/`false`)
-- `hf_token` (optional)
-
-DAG: `orchestration/airflow/dags/train_ddp_lora.py`
-
-### Kubernetes
-- Build & push your Docker image.
-- Prepare PVC `ddp-lora-pvc` and Secret `wandb-secret` with `api_key`.
-- Apply `orchestration/k8s/cronjob.yaml` and tune resources.
-
-## Efficiency Helper
+Run a sweep:
 ```bash
-python scripts/bench_efficiency.py --tokens1 1500 --tokensN 11000 --N 8
-# -> Scaling efficiency: 91.67%
+bash scripts/wandb_sweep.sh
 ```
 
+---
 
-## Advanced: DeepSpeed, FSDP, QLoRA, FlashAttention/SDPA
-See configs/base.yaml and README sections for usage.
+## ☸️ Orchestration
+
+### Airflow DAG
+- Located in `orchestration/airflow/dags/train_ddp_lora.py`.  
+- Configure via Airflow Variables (`ddp_lora_repo_path`, `hf_dataset`, etc.).  
+
+### Kubernetes CronJob
+- `orchestration/k8s/cronjob.yaml` schedules recurring training jobs.  
+- Requires GPU node pool + `wandb-secret` + PVC `ddp-lora-pvc`.  
+
+---
+
+## 📈 Benchmarking
+```bash
+python scripts/bench_efficiency.py --config configs/base.yaml --gpus 8
+```
+Generates scaling efficiency plots (tokens/sec vs GPUs).  
+
+---
+
+## 📝 License
+Apache-2.0  
+
+---
+
+⚡ Maintainer: [Your Name](https://github.com/<your-username>)  
