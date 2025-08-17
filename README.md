@@ -17,7 +17,6 @@ This project provides a **production-grade, reproducible training infrastructure
 - **High throughput** with sharded streaming datasets + optimized I/O.  
 - **Research enablement**: rapid prototyping of new training methods.  
 
-![Architecture](architecture.png)
 
 ---
 
