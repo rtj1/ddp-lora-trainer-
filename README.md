@@ -123,4 +123,4 @@ Apache-2.0
 
 ---
 
-⚡ Maintainer: [Your Name](https://github.com/<your-username>)  
+⚡ Maintainer: [Tharun Jagarlamudi](https://github.com/rtj1)  
