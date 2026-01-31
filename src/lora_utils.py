@@ -1,12 +1,32 @@
-from peft import LoraConfig, get_peft_model, TaskType
-def apply_lora(model, target_modules, r=8, alpha=16, dropout=0.05):
-    lcfg = LoraConfig(
-        r=r, lora_alpha=alpha, lora_dropout=dropout, bias="none",
-        task_type=TaskType.CAUSAL_LM, target_modules=target_modules
-    )
-    model = get_peft_model(model, lcfg)
-    try:
-        model.print_trainable_parameters()
-    except Exception:
-        pass
-    return model
+"""
+LoRA utilities - backward compatible wrapper.
+
+This module provides backward compatibility while using our custom LoRA implementation.
+For the full implementation with detailed documentation, see lora.py
+"""
+
+from .lora import (
+    apply_lora,
+    apply_lora_to_model,
+    LoRAConfig,
+    LoRALinear,
+    count_parameters,
+    get_lora_params,
+    merge_lora_weights,
+    unmerge_lora_weights,
+    save_lora_weights,
+    load_lora_weights,
+)
+
+__all__ = [
+    "apply_lora",
+    "apply_lora_to_model",
+    "LoRAConfig",
+    "LoRALinear",
+    "count_parameters",
+    "get_lora_params",
+    "merge_lora_weights",
+    "unmerge_lora_weights",
+    "save_lora_weights",
+    "load_lora_weights",
+]
