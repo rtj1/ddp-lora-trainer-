@@ -27,6 +27,12 @@ import math
 from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass
 
+# Try to import Conv1D from transformers (used by GPT-2)
+try:
+    from transformers.pytorch_utils import Conv1D
+except ImportError:
+    Conv1D = None
+
 
 @dataclass
 class LoRAConfig:
@@ -316,6 +322,7 @@ def apply_lora_to_model(
         # Check if this module should be replaced
         module_name = name.split(".")[-1]
 
+        # Check for nn.Linear
         if isinstance(module, nn.Linear) and module_name in target_names:
             # Detect if this is GPT-2 style Conv1D stored as Linear
             fan_in_fan_out = hasattr(module, "nf") or (
@@ -331,6 +338,47 @@ def apply_lora_to_model(
                 dropout=config.dropout,
                 fan_in_fan_out=fan_in_fan_out,
             )
+
+            # Replace in model
+            replace_module(model, name, lora_module)
+            replaced.append(name)
+
+        # Check for transformers Conv1D (used by GPT-2)
+        elif Conv1D is not None and isinstance(module, Conv1D) and module_name in target_names:
+            # Conv1D stores weights as (in_features, out_features)
+            # For fan_in_fan_out=True, we store as-is and transpose in forward pass
+            in_features = module.weight.shape[0]
+            out_features = module.weight.shape[1]
+
+            # Create a LoRALinear with fan_in_fan_out=True for Conv1D
+            lora_module = LoRALinear(
+                in_features=in_features,
+                out_features=out_features,
+                r=config.r,
+                alpha=config.alpha,
+                dropout=config.dropout,
+                fan_in_fan_out=True,  # Conv1D uses transposed weights
+            )
+
+            # Copy Conv1D weights (stored as in_features, out_features)
+            # For fan_in_fan_out=True, forward does F.linear(x, weight.T)
+            # So we store as (in_features, out_features) directly
+            with torch.no_grad():
+                lora_module.weight = nn.Parameter(
+                    module.weight.clone(), requires_grad=False
+                )
+                # Reinitialize lora_A and lora_B with correct dimensions
+                lora_module.lora_A = nn.Parameter(
+                    torch.empty(config.r, in_features, device=module.weight.device, dtype=module.weight.dtype)
+                )
+                lora_module.lora_B = nn.Parameter(
+                    torch.empty(out_features, config.r, device=module.weight.device, dtype=module.weight.dtype)
+                )
+                nn.init.kaiming_uniform_(lora_module.lora_A, a=math.sqrt(5))
+                nn.init.zeros_(lora_module.lora_B)
+
+                if module.bias is not None:
+                    lora_module.bias = nn.Parameter(module.bias.clone(), requires_grad=False)
 
             # Replace in model
             replace_module(model, name, lora_module)

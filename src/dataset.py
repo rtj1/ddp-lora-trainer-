@@ -320,14 +320,19 @@ def build_dataloader(
         lines = lines[rank::world_size]
 
     ds = TextFileDataset(lines)
-    loader = DataLoader(
-        ds,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=cfg_data.get("num_workers", 4),
-        prefetch_factor=cfg_data.get("prefetch_factor", 4),
-        pin_memory=cfg_data.get("pin_memory", True),
-        drop_last=True,
-        collate_fn=collate,
-    )
+    num_workers = cfg_data.get("num_workers", 4)
+
+    # prefetch_factor is only valid when num_workers > 0
+    loader_kwargs = {
+        "batch_size": batch_size,
+        "shuffle": shuffle,
+        "num_workers": num_workers,
+        "pin_memory": cfg_data.get("pin_memory", True) if num_workers > 0 else False,
+        "drop_last": True,
+        "collate_fn": collate,
+    }
+    if num_workers > 0:
+        loader_kwargs["prefetch_factor"] = cfg_data.get("prefetch_factor", 4)
+
+    loader = DataLoader(ds, **loader_kwargs)
     return loader, collate
