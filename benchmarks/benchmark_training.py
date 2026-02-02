@@ -142,8 +142,10 @@ def run_training_benchmark(
     trainable_params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.AdamW(trainable_params, lr=1e-4)
 
-    # Mixed precision
-    scaler = torch.cuda.amp.GradScaler(enabled=use_amp and device == "cuda")
+    # Mixed precision - GradScaler only works with FP16, not BFloat16
+    # BFloat16 doesn't need loss scaling due to its larger exponent range
+    use_scaler = use_amp and device == "cuda" and dtype == torch.float16
+    scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
 
     memory = MemoryTracker()
     memory.reset()
@@ -161,7 +163,7 @@ def run_training_benchmark(
             torch.cuda.synchronize()
         t0 = time.perf_counter()
 
-        with torch.cuda.amp.autocast(enabled=use_amp, dtype=dtype):
+        with torch.amp.autocast("cuda", enabled=use_amp and device == "cuda", dtype=dtype):
             outputs = model(**batch)
             loss = outputs.loss
 
@@ -211,7 +213,7 @@ def benchmark_batch_sizes(
     batch_sizes: List[int] = None,
     lora_rank: int = 0,
     use_amp: bool = True,
-    dtype_str: str = "bf16",
+    dtype_str: str = "fp16",
     gradient_checkpointing: bool = False,
 ) -> List[BenchmarkResult]:
     """Benchmark training at various batch sizes."""
